@@ -61,8 +61,8 @@ fn parse_identifier() {
     assert_eq!(
         super::parse(tokens),
         Identifier("hello".to_string())
-            .into_ast()
-            .cons_to(Nil.into_ast())
+            .into_ast(Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
     );
 }
 
@@ -73,9 +73,9 @@ fn parse_list() {
     assert_eq!(
         super::parse(tokens),
         Identifier("hello".to_string())
-            .into_ast()
-            .cons_to(Nil.into_ast())
-            .cons_to(Nil.into_ast())
+            .into_ast(Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
     );
 }
 
@@ -86,13 +86,14 @@ fn parse_simple_order_in_list() {
     assert_eq!(
         super::parse(tokens).pretty(),
         Identifier::<()>("hello".to_string())
-            .into_ast()
+            .into_ast(Default::default())
             .cons_to(
                 Identifier("world!".to_string())
-                    .into_ast()
-                    .cons_to(Nil.into_ast())
+                    .into_ast(Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                Default::default()
             )
-            .cons_to(Nil.into_ast())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }
@@ -104,15 +105,16 @@ fn parse_listed_order_in_list() {
     assert_eq!(
         super::parse(tokens).pretty(),
         Identifier::<()>("hello".to_string())
-            .into_ast()
-            .cons_to(Nil.into_ast())
+            .into_ast(Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
             .cons_to(
                 Identifier("world!".to_string())
-                    .into_ast()
-                    .cons_to(Nil.into_ast())
-                    .cons_to(Nil.into_ast())
+                    .into_ast(Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                Default::default()
             )
-            .cons_to(Nil.into_ast())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }
@@ -126,10 +128,12 @@ fn parse_big_list() {
         ["hello", "there", "i", "have", "words"]
             .iter()
             .rev()
-            .fold(Nil.into_ast(), |acc, &name| Identifier(name.to_owned())
-                .into_ast()
-                .cons_to(acc))
-            .cons_to(Nil::<()>.into_ast())
+            .fold(Nil.into_ast(Default::default()), |acc, &name| Identifier(
+                name.to_owned()
+            )
+            .into_ast(Default::default())
+            .cons_to(acc, Default::default()))
+            .cons_to(Nil::<()>.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }
@@ -140,9 +144,11 @@ fn parse_two_lists() {
     let tokens = super::lex("() ()");
     assert_eq!(
         super::parse(tokens),
-        Nil::<()>
-            .into_ast()
-            .cons_to(Nil.into_ast().cons_to(Nil.into_ast()))
+        Nil::<()>.into_ast(Default::default()).cons_to(
+            Nil.into_ast(Default::default())
+                .cons_to(Nil.into_ast(Default::default()), Default::default()),
+            Default::default()
+        )
     );
 }
 
@@ -153,10 +159,10 @@ fn parse_nested_list() {
     assert_eq!(
         super::parse(tokens),
         Identifier::<()>("hello".to_string())
-            .into_ast()
-            .cons_to(Nil.into_ast())
-            .cons_to(Nil.into_ast())
-            .cons_to(Nil.into_ast())
+            .into_ast(Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
     )
 }
 
@@ -167,11 +173,12 @@ fn parse_smaller_list_structure() {
     assert_eq!(
         super::parse(tokens).pretty(),
         Nil::<()>
-            .into_ast()
+            .into_ast(Default::default())
             .cons_to(
-                Nil.into_ast()
-                    .cons_to(Nil.into_ast())
-                    .cons_to(Nil.into_ast())
+                Nil.into_ast(Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                Default::default()
             )
             .pretty(),
     );
@@ -184,14 +191,15 @@ fn parse_medium_list() {
     assert_eq!(
         super::parse(tokens).pretty(),
         Identifier::<()>("id".to_string())
-            .into_ast()
+            .into_ast(Default::default())
             .cons_to(
                 Identifier("id2".to_string())
-                    .into_ast()
-                    .cons_to(Nil.into_ast())
-                    .cons_to(Nil.into_ast())
+                    .into_ast(Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                Default::default()
             )
-            .cons_to(Nil.into_ast())
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }
@@ -203,16 +211,51 @@ fn parse_list_structure() {
     assert_eq!(
         super::parse(tokens).pretty(),
         Nil::<()>
-            .into_ast()
+            .into_ast(Default::default())
             .cons_to(
-                Nil.into_ast()
+                Nil.into_ast(Default::default())
                     .cons_to(
-                        Nil.into_ast()
-                            .cons_to(Nil.into_ast())
-                            .cons_to(Nil.into_ast())
+                        Nil.into_ast(Default::default())
+                            .cons_to(Nil.into_ast(Default::default()), Default::default())
+                            .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                        Default::default()
                     )
-                    .cons_to(Nil.into_ast())
+                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
+                Default::default()
             )
+            .pretty()
+    );
+}
+
+#[test]
+fn parse_infix_dot() {
+    use super::AstValue::*;
+    let tokens = super::lex("a . b");
+    assert_eq!(
+        super::parse(tokens).pretty(),
+        Identifier::<()>("a".to_string())
+            .into_ast(Default::default())
+            .cons_to(
+                Identifier("b".to_string()).into_ast(Default::default()),
+                Default::default()
+            )
+            .pretty()
+    );
+}
+
+#[test]
+fn parse_infix_dot_in_list() {
+    use super::AstValue::*;
+    let tokens = super::lex("(a . b)");
+    assert_eq!(
+        super::parse(tokens).pretty(),
+        Identifier::<()>("a".to_string())
+            .into_ast(Default::default())
+            .cons_to(
+                Identifier("b".to_string()).into_ast(Default::default()),
+                Default::default()
+            )
+            .cons_to(Nil.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }

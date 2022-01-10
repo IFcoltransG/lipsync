@@ -62,18 +62,17 @@ enum AstValue<V> {
     Var(V),
 }
 
-impl<V> AstValue<V> {
-    fn into_ast(self) -> Ast<V> {
-        Ast(self, TypeVar::Unknown)
-    }
-}
-
 #[derive(Debug, Eq, PartialEq, Clone)]
 struct Ast<V>(AstValue<V>, TypeVar<V>);
 
+impl<V> AstValue<V> {
+    fn into_ast(self, parameters: V) -> Ast<V> {
+        Ast(self, TypeVar::Unknown)
+    }
+}
 impl<V> Ast<V> {
-    fn cons_to(self, tail: Ast<V>) -> Ast<V> {
-        AstValue::Cons(Box::new(self), Box::new(tail)).into_ast()
+    fn cons_to(self, tail: Ast<V>, parameters: V) -> Ast<V> {
+        AstValue::Cons(Box::new(self), Box::new(tail)).into_ast(parameters)
     }
 
     fn pretty(&self) -> String {
@@ -89,24 +88,59 @@ impl<V> Ast<V> {
 }
 
 fn parse(tokens: Vec<Token>) -> Ast<()> {
-    fn assemble_token_list<V: Clone>(tokens: Vec<Tokenlike<V>>) -> Ast<V> {
+    fn assemble_token_list<V: Clone + Eq + Default>(tokens: Vec<Tokenlike<V>>) -> Ast<V> {
+        fn add_next_value<V: Clone + Eq + Default>(
+            value: Ast<V>,
+            current_ast: &mut Ast<V>,
+            ops: &mut Vec<Operator<V>>,
+        ) {
+            if let Some(operator) = ops.pop() {
+                match operator {
+                    DotOp(cdr) => *current_ast = cdr,
+                    ColonOp(_) => todo!(),
+                }
+            }
+            *current_ast = value.cons_to(current_ast.clone(), Default::default());
+        }
+        enum Operator<V> {
+            DotOp(Ast<V>),
+            ColonOp(Ast<V>),
+        }
         use AstValue::*;
-        let mut current_ast = Nil.into_ast();
+        use Operator::*;
+        let mut operators = Vec::with_capacity(tokens.len());
+        let mut current_ast = Nil.into_ast(Default::default());
         let mut token_stream = tokens.iter();
         while let Some(next_token) = token_stream.next() {
             match next_token {
                 LeftBracketMarker => panic!("Left bracket inside a list somehow?"),
                 TokenMarker(LeftBracket | RightBracket) => panic!("Bracket inside list somehow?"),
-                TokenMarker(IdentifierToken(name)) => {
-                    current_ast = Identifier(name.to_owned()).into_ast().cons_to(current_ast)
+                TokenMarker(IdentifierToken(name)) => add_next_value(
+                    Identifier(name.to_owned()).into_ast(Default::default()),
+                    &mut current_ast,
+                    &mut operators,
+                ),
+                TokenMarker(NumberToken(number)) => add_next_value(
+                    Number(number.to_owned()).into_ast(Default::default()),
+                    &mut current_ast,
+                    &mut operators,
+                ),
+                TokenMarker(Dot) => {
+                    if let Ast(Cons(ref last_value, ref rest), _) = current_ast {
+                        if **rest != Nil.into_ast(Default::default()) {
+                            panic!("Dot with more than one expression following")
+                        }
+                        operators.push(DotOp(*(*last_value).clone()))
+                    } else {
+                        panic!("Dot at end of list")
+                    }
                 }
-                TokenMarker(NumberToken(number)) => {
-                    current_ast = Number(number.to_owned()).into_ast().cons_to(current_ast)
-                }
-                TokenMarker(Dot) => todo!(),
                 TokenMarker(Colon) => todo!(),
-                TokenList(ast) => current_ast = ast.clone().cons_to(current_ast),
+                TokenList(ast) => add_next_value(ast.clone(), &mut current_ast, &mut operators),
             }
+        }
+        if !operators.is_empty() {
+            panic!("Trailing operator")
         }
         current_ast
     }
