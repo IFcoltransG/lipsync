@@ -185,7 +185,12 @@ fn parse_medium_list() {
         super::parse(tokens).pretty(),
         Identifier::<()>("id".to_string())
             .into_ast()
-            .cons_to(Nil.into_ast())
+            .cons_to(
+                Identifier("id2".to_string())
+                    .into_ast()
+                    .cons_to(Nil.into_ast())
+                    .cons_to(Nil.into_ast())
+            )
             .cons_to(Nil.into_ast())
             .pretty()
     );
