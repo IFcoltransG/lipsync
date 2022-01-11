@@ -1,3 +1,5 @@
+use std::{default, fmt::Debug};
+
 #[derive(Debug, Eq, PartialEq, Clone)]
 enum Token {
     LeftBracket,
@@ -45,10 +47,19 @@ fn lex(input: &str) -> Vec<Token> {
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-enum TypeVar<V> {
-    Unknown,
-    Type,
-    Expr(AstNode<V>), // This is going to go infinite I think because corecursion
+enum Type<V> {
+    Unknown(V),
+    Expr(AstNode<V>),
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct TypeContext {
+    latest_id: usize,
+}
+
+#[derive(Debug, Eq, PartialEq, Clone)]
+struct TypeVar {
+    id: usize,
 }
 
 type AstNode<V> = Box<Ast<V>>;
@@ -58,16 +69,35 @@ enum AstValue<V> {
     Identifier(String),
     Number(String), // should probably do some parsing here
     Cons(AstNode<V>, AstNode<V>),
+    Ascription(AstNode<V>, Type<V>),
     Nil,
-    Var(V),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct Ast<V>(AstValue<V>, TypeVar<V>);
+struct Ast<V>(AstValue<V>, Type<V>);
+
+impl TypeContext {
+    fn new() -> Self {
+        Self { latest_id: 0 }
+    }
+
+    fn next_id(&mut self) -> usize {
+        self.latest_id += 1;
+        self.latest_id
+    }
+}
+
+impl TypeVar {
+    fn new(context: &mut TypeContext) -> Self {
+        TypeVar {
+            id: context.next_id(),
+        }
+    }
+}
 
 impl<V> AstValue<V> {
     fn into_ast(self, parameters: V) -> Ast<V> {
-        Ast(self, TypeVar::Unknown)
+        Ast(self, Type::Unknown(parameters))
     }
 }
 impl<V> Ast<V> {
@@ -75,6 +105,12 @@ impl<V> Ast<V> {
         AstValue::Cons(Box::new(self), Box::new(tail)).into_ast(parameters)
     }
 
+    fn ascribe(self, type_of: Ast<V>, parameters: V) -> Ast<V> {
+        AstValue::Ascription(Box::new(self), Type::Expr(Box::new(type_of))).into_ast(parameters)
+    }
+}
+
+impl<V: Debug> Ast<V> {
     fn pretty(&self) -> String {
         use AstValue::*;
         match self {
@@ -82,26 +118,52 @@ impl<V> Ast<V> {
             Ast(Number(number), _) => number.to_owned(),
             Ast(Cons(left, right), _) => format!("({}.{})", left.pretty(), right.pretty()),
             Ast(Nil, _) => "()".to_owned(),
-            Ast(Var(..), _) => "VAR".to_owned(),
+            Ast(Ascription(left, right), _) => format!("({}:{})", left.pretty(), right.pretty()),
         }
     }
 }
 
-fn parse(tokens: Vec<Token>) -> Ast<()> {
-    fn assemble_token_list<V: Clone + Eq + Default>(tokens: Vec<Tokenlike<V>>) -> Ast<V> {
-        fn add_next_value<V: Clone + Eq + Default>(
-            value: Ast<V>,
-            current_ast: &mut Ast<V>,
-            ops: &mut Vec<Operator<V>>,
+impl<V: Debug> Type<V> {
+    fn pretty(&self) -> String {
+        match self {
+            Type::Unknown(_) => "?".to_string(),
+            Type::Expr(ast) => format!("TyFrom[{}]", ast.pretty()),
+        }
+    }
+}
+
+fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
+    fn assemble_token_list(
+        tokens: Vec<Tokenlike<TypeVar>>,
+        context: &mut TypeContext,
+    ) -> Ast<TypeVar> {
+        fn add_next_value(
+            mut value: Ast<TypeVar>,
+            current_ast: &mut Ast<TypeVar>,
+            ops: &mut Vec<Operator<TypeVar>>,
+            context: &mut TypeContext,
         ) {
+            use Type::*;
             if let Some(operator) = ops.pop() {
                 match operator {
-                    DotOp(cdr) => *current_ast = cdr,
-                    ColonOp(_) => todo!(),
+                    DotOp(cdr) => *current_ast = cdr, // current_ast should be Nil
+                    ColonOp(mut type_ast) => {
+                        if let Ast(Ascription(first_type, Expr(second_type)), _) = type_ast.clone()
+                        {
+                            value = Ascription(Box::new(value), Expr(first_type))
+                                .into_ast(TypeVar::new(context));
+                            type_ast = *second_type;
+                        }
+                        *current_ast = Ascription(Box::new(value), Expr(Box::new(type_ast)))
+                            .into_ast(TypeVar::new(context))
+                            .cons_to(current_ast.clone(), TypeVar::new(context));
+                        return;
+                    }
                 }
             }
-            *current_ast = value.cons_to(current_ast.clone(), Default::default());
+            *current_ast = value.cons_to(current_ast.clone(), TypeVar::new(context));
         }
+        #[derive(Debug, Eq, PartialEq, Clone)]
         enum Operator<V> {
             DotOp(Ast<V>),
             ColonOp(Ast<V>),
@@ -109,25 +171,27 @@ fn parse(tokens: Vec<Token>) -> Ast<()> {
         use AstValue::*;
         use Operator::*;
         let mut operators = Vec::with_capacity(tokens.len());
-        let mut current_ast = Nil.into_ast(Default::default());
+        let mut current_ast = Nil.into_ast(TypeVar::new(context));
         let mut token_stream = tokens.iter();
         while let Some(next_token) = token_stream.next() {
             match next_token {
                 LeftBracketMarker => panic!("Left bracket inside a list somehow?"),
                 TokenMarker(LeftBracket | RightBracket) => panic!("Bracket inside list somehow?"),
                 TokenMarker(IdentifierToken(name)) => add_next_value(
-                    Identifier(name.to_owned()).into_ast(Default::default()),
+                    Identifier(name.to_owned()).into_ast(TypeVar::new(context)),
                     &mut current_ast,
                     &mut operators,
+                    context,
                 ),
                 TokenMarker(NumberToken(number)) => add_next_value(
-                    Number(number.to_owned()).into_ast(Default::default()),
+                    Number(number.to_owned()).into_ast(TypeVar::new(context)),
                     &mut current_ast,
                     &mut operators,
+                    context,
                 ),
                 TokenMarker(Dot) => {
                     if let Ast(Cons(ref last_value, ref rest), _) = current_ast {
-                        if **rest != Nil.into_ast(Default::default()) {
+                        if **rest != Nil.into_ast(TypeVar::new(context)) {
                             panic!("Dot with more than one expression following")
                         }
                         operators.push(DotOp(*(*last_value).clone()))
@@ -135,8 +199,18 @@ fn parse(tokens: Vec<Token>) -> Ast<()> {
                         panic!("Dot at end of list")
                     }
                 }
-                TokenMarker(Colon) => todo!(),
-                TokenList(ast) => add_next_value(ast.clone(), &mut current_ast, &mut operators),
+                TokenMarker(Colon) => {
+                    if let Ast(Cons(last_value, ref rest), _) = current_ast {
+                        current_ast = *rest.clone();
+                        operators.push(ColonOp(*last_value))
+                        // colon op contains ascribed type
+                    } else {
+                        panic!("Colon at end of list")
+                    }
+                }
+                TokenList(ast) => {
+                    add_next_value(ast.clone(), &mut current_ast, &mut operators, context)
+                }
             }
         }
         if !operators.is_empty() {
@@ -151,6 +225,7 @@ fn parse(tokens: Vec<Token>) -> Ast<()> {
         TokenMarker(Token),
         TokenList(Ast<V>),
     }
+    
     use Token::*;
     use Tokenlike::*;
     let mut stack = Vec::with_capacity(tokens.len());
@@ -167,7 +242,7 @@ fn parse(tokens: Vec<Token>) -> Ast<()> {
                     }
                     token_list.push(token)
                 }
-                stack.push(TokenList(assemble_token_list(token_list)))
+                stack.push(TokenList(assemble_token_list(token_list, context)))
             }
             IdentifierToken(name) => stack.push(TokenMarker(IdentifierToken(name.to_string()))),
             NumberToken(number) => stack.push(TokenMarker(NumberToken(number.to_string()))),
@@ -184,8 +259,12 @@ fn parse(tokens: Vec<Token>) -> Ast<()> {
     if !stack.is_empty() {
         panic!("Couldn't parse")
     }
-    assemble_token_list(output)
+    assemble_token_list(output, context)
 }
+
+// fn typecheck(Ast<>) {
+
+//}
 
 #[cfg(test)]
 mod tests;

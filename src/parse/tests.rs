@@ -56,129 +56,191 @@ fn lex_punctuation() {
 
 #[test]
 fn parse_identifier() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("hello");
     assert_eq!(
-        super::parse(tokens),
+        super::parse(tokens, parse_context),
         Identifier("hello".to_string())
-            .into_ast(Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .into_ast(TypeVar::new(golden_context))
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
     );
 }
 
 #[test]
 fn parse_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello)");
     assert_eq!(
-        super::parse(tokens),
+        super::parse(tokens, parse_context),
         Identifier("hello".to_string())
-            .into_ast(Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .into_ast(TypeVar::new(golden_context))
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
     );
 }
 
 #[test]
 fn parse_simple_order_in_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello world!)");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Identifier::<()>("hello".to_string())
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("hello".to_string())
+            .into_ast(TypeVar::new(golden_context))
             .cons_to(
                 Identifier("world!".to_string())
-                    .into_ast(Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                Default::default()
+                    .into_ast(TypeVar::new(golden_context))
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
             )
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
             .pretty()
     );
 }
 
 #[test]
 fn parse_listed_order_in_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("((hello) (world!))");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Identifier::<()>("hello".to_string())
-            .into_ast(Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("hello".to_string())
+            .into_ast(TypeVar::new(golden_context))
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
             .cons_to(
                 Identifier("world!".to_string())
-                    .into_ast(Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                Default::default()
+                    .into_ast(TypeVar::new(golden_context))
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    )
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
             )
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
             .pretty()
     );
 }
 
 #[test]
 fn parse_big_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello there i have words)");
     assert_eq!(
-        super::parse(tokens).pretty(),
+        super::parse(tokens, parse_context).pretty(),
         ["hello", "there", "i", "have", "words"]
             .iter()
             .rev()
-            .fold(Nil.into_ast(Default::default()), |acc, &name| Identifier(
-                name.to_owned()
+            .fold(Nil.into_ast(TypeVar::new(golden_context)), |acc, &name| {
+                Identifier(name.to_owned())
+                    .into_ast(TypeVar::new(golden_context))
+                    .cons_to(acc, TypeVar::new(golden_context))
+            })
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
             )
-            .into_ast(Default::default())
-            .cons_to(acc, Default::default()))
-            .cons_to(Nil::<()>.into_ast(Default::default()), Default::default())
             .pretty()
     );
 }
 
 #[test]
 fn parse_two_lists() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() ()");
     assert_eq!(
-        super::parse(tokens),
-        Nil::<()>.into_ast(Default::default()).cons_to(
-            Nil.into_ast(Default::default())
-                .cons_to(Nil.into_ast(Default::default()), Default::default()),
-            Default::default()
+        super::parse(tokens, parse_context),
+        Nil.into_ast(TypeVar::new(golden_context)).cons_to(
+            Nil.into_ast(TypeVar::new(golden_context)).cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            ),
+            TypeVar::new(golden_context)
         )
     );
 }
 
 #[test]
 fn parse_nested_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("((hello))");
     assert_eq!(
-        super::parse(tokens),
-        Identifier::<()>("hello".to_string())
-            .into_ast(Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+        super::parse(tokens, parse_context),
+        Identifier("hello".to_string())
+            .into_ast(TypeVar::new(golden_context))
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
     )
 }
 
 #[test]
 fn parse_smaller_list_structure() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() (())");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Nil::<()>
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Nil.into_ast(TypeVar::new(golden_context))
             .cons_to(
-                Nil.into_ast(Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                Default::default()
+                Nil.into_ast(TypeVar::new(golden_context))
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    )
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
             )
             .pretty(),
     );
@@ -186,42 +248,63 @@ fn parse_smaller_list_structure() {
 
 #[test]
 fn parse_medium_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(id (id2))");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Identifier::<()>("id".to_string())
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("id".to_string())
+            .into_ast(TypeVar::new(golden_context))
             .cons_to(
                 Identifier("id2".to_string())
-                    .into_ast(Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default())
-                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                Default::default()
+                    .into_ast(TypeVar::new(golden_context))
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    )
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
             )
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
             .pretty()
     );
 }
 
 #[test]
 fn parse_list_structure() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() (() (()))");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Nil::<()>
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Nil.into_ast(TypeVar::new(golden_context))
             .cons_to(
-                Nil.into_ast(Default::default())
+                Nil.into_ast(TypeVar::new(golden_context))
                     .cons_to(
-                        Nil.into_ast(Default::default())
-                            .cons_to(Nil.into_ast(Default::default()), Default::default())
-                            .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                        Default::default()
+                        Nil.into_ast(TypeVar::new(golden_context))
+                            .cons_to(
+                                Nil.into_ast(TypeVar::new(golden_context)),
+                                TypeVar::new(golden_context)
+                            )
+                            .cons_to(
+                                Nil.into_ast(TypeVar::new(golden_context)),
+                                TypeVar::new(golden_context)
+                            ),
+                        TypeVar::new(golden_context)
                     )
-                    .cons_to(Nil.into_ast(Default::default()), Default::default()),
-                Default::default()
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
             )
             .pretty()
     );
@@ -229,15 +312,17 @@ fn parse_list_structure() {
 
 #[test]
 fn parse_infix_dot() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("a . b");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Identifier::<()>("a".to_string())
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("a".to_string())
+            .into_ast(TypeVar::new(golden_context))
             .cons_to(
-                Identifier("b".to_string()).into_ast(Default::default()),
-                Default::default()
+                Identifier("b".to_string()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
             )
             .pretty()
     );
@@ -245,17 +330,109 @@ fn parse_infix_dot() {
 
 #[test]
 fn parse_infix_dot_in_list() {
-    use super::AstValue::*;
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(a . b)");
     assert_eq!(
-        super::parse(tokens).pretty(),
-        Identifier::<()>("a".to_string())
-            .into_ast(Default::default())
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("a".to_string())
+            .into_ast(TypeVar::new(golden_context))
             .cons_to(
-                Identifier("b".to_string()).into_ast(Default::default()),
-                Default::default()
+                Identifier("b".to_string()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
             )
-            .cons_to(Nil.into_ast(Default::default()), Default::default())
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .pretty()
+    );
+}
+
+#[test]
+fn parse_colon() {
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
+    let tokens = super::lex("a : b");
+    assert_eq!(
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("a".to_owned())
+            .into_ast(TypeVar::new(golden_context))
+            .ascribe(
+                Identifier("b".to_owned()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .pretty()
+    );
+}
+
+#[test]
+fn parse_adjacent_colons() {
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
+    let tokens = super::lex("(a : b c : d)");
+    assert_eq!(
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("a".to_owned())
+            .into_ast(TypeVar::new(golden_context))
+            .ascribe(
+                Identifier("b".to_owned()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Identifier("c".to_owned())
+                    .into_ast(TypeVar::new(golden_context))
+                    .ascribe(
+                        Identifier("d".to_owned()).into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    )
+                    .cons_to(
+                        Nil.into_ast(TypeVar::new(golden_context)),
+                        TypeVar::new(golden_context)
+                    ),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .pretty()
+    );
+}
+
+#[test]
+fn parse_nested_colons() {
+    use super::{AstValue::*, TypeContext, TypeVar};
+    let parse_context = &mut TypeContext::new();
+    let golden_context = &mut TypeContext::new();
+    let tokens = super::lex("(a : b : d)");
+    assert_eq!(
+        super::parse(tokens, parse_context).pretty(),
+        Identifier("a".to_owned())
+            .into_ast(TypeVar::new(golden_context))
+            .ascribe(
+                Identifier("b".to_owned()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .ascribe(
+                Identifier("d".to_owned()).into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
+            .cons_to(
+                Nil.into_ast(TypeVar::new(golden_context)),
+                TypeVar::new(golden_context)
+            )
             .pretty()
     );
 }
