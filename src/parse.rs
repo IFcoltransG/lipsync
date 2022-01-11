@@ -11,7 +11,7 @@ enum Token {
 }
 
 fn is_id(character: &char) -> bool {
-    !character.is_whitespace() && "().:".chars().all(|x| &x != character)
+    !(character.is_whitespace() || "().:".contains(*character))
 }
 
 fn lex(input: &str) -> Vec<Token> {
@@ -73,8 +73,17 @@ enum AstValue<V> {
     Nil,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 struct Ast<V>(AstValue<V>, Type<V>);
+
+impl<V: PartialEq> PartialEq for Ast<V> {
+    fn eq(&self, Ast(other_val, _): &Self) -> bool {
+        let Ast(self_val, _) = self;
+        self_val == other_val
+    }
+}
+
+impl<V: PartialEq> Eq for Ast<V> {}
 
 impl TypeContext {
     fn new() -> Self {
@@ -225,7 +234,7 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
         TokenMarker(Token),
         TokenList(Ast<V>),
     }
-    
+
     use Token::*;
     use Tokenlike::*;
     let mut stack = Vec::with_capacity(tokens.len());
