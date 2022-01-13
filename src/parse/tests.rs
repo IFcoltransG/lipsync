@@ -1,17 +1,18 @@
+use super::{AstValue::*, Location, Token::*, TypeContext, TypeVar};
+
 #[test]
 fn lex_works() {
-    use super::Token::*;
     let lexed = super::lex("(    asdasd asdasd)assdasd))((");
     let golden = vec![
-        LeftBracket,
-        IdentifierToken("asdasd".to_string()),
-        IdentifierToken("asdasd".to_string()),
-        RightBracket,
-        IdentifierToken("assdasd".to_string()),
-        RightBracket,
-        RightBracket,
-        LeftBracket,
-        LeftBracket,
+        LeftBracket(Location(0)),
+        IdentifierToken("asdasd".to_string(), Location(0)),
+        IdentifierToken("asdasd".to_string(), Location(0)),
+        RightBracket(Location(0)),
+        IdentifierToken("assdasd".to_string(), Location(0)),
+        RightBracket(Location(0)),
+        RightBracket(Location(0)),
+        LeftBracket(Location(0)),
+        LeftBracket(Location(0)),
     ];
 
     assert_eq!(lexed, golden);
@@ -19,44 +20,45 @@ fn lex_works() {
 
 #[test]
 fn lex_works_with_symbols() {
-    use super::Token::*;
     assert_eq!(
         super::lex("a b-c 12345 ..."),
         vec![
-            IdentifierToken("a".to_string()),
-            IdentifierToken("b-c".to_string()),
-            NumberToken("12345".to_string()),
-            Dot,
-            Dot,
-            Dot
+            IdentifierToken("a".to_string(), Location(0)),
+            IdentifierToken("b-c".to_string(), Location(0)),
+            NumberToken("12345".to_string(), Location(0)),
+            Dot(Location(0)),
+            Dot(Location(0)),
+            Dot(Location(0))
         ]
     );
 }
 
 #[test]
 fn lex_ids_starting_with_numbers() {
-    use super::Token::*;
     assert_eq!(
         super::lex("111aaa"),
         vec![
-            NumberToken("111".to_string()),
-            IdentifierToken("aaa".to_string()),
+            NumberToken("111".to_string(), Location(0)),
+            IdentifierToken("aaa".to_string(), Location(0)),
         ]
     );
 }
 
 #[test]
 fn lex_punctuation() {
-    use super::Token::*;
     assert_eq!(
         super::lex(".():"),
-        vec![Dot, LeftBracket, RightBracket, Colon]
+        vec![
+            Dot(Location(0)),
+            LeftBracket(Location(0)),
+            RightBracket(Location(0)),
+            Colon(Location(0))
+        ]
     );
 }
 
 #[test]
 fn parse_identifier() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("hello");
@@ -73,7 +75,6 @@ fn parse_identifier() {
 
 #[test]
 fn parse_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello)");
@@ -94,7 +95,6 @@ fn parse_list() {
 
 #[test]
 fn parse_simple_order_in_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello world!)");
@@ -121,7 +121,6 @@ fn parse_simple_order_in_list() {
 
 #[test]
 fn parse_listed_order_in_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("((hello) (world!))");
@@ -156,7 +155,6 @@ fn parse_listed_order_in_list() {
 
 #[test]
 fn parse_big_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(hello there i have words)");
@@ -180,7 +178,6 @@ fn parse_big_list() {
 
 #[test]
 fn parse_two_lists() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() ()");
@@ -198,7 +195,6 @@ fn parse_two_lists() {
 
 #[test]
 fn parse_nested_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("((hello))");
@@ -223,7 +219,6 @@ fn parse_nested_list() {
 
 #[test]
 fn parse_smaller_list_structure() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() (())");
@@ -248,7 +243,6 @@ fn parse_smaller_list_structure() {
 
 #[test]
 fn parse_medium_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(id (id2))");
@@ -279,7 +273,6 @@ fn parse_medium_list() {
 
 #[test]
 fn parse_list_structure() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("() (() (()))");
@@ -312,7 +305,6 @@ fn parse_list_structure() {
 
 #[test]
 fn parse_infix_dot() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("a . b");
@@ -330,7 +322,6 @@ fn parse_infix_dot() {
 
 #[test]
 fn parse_infix_dot_in_list() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(a . b)");
@@ -352,7 +343,6 @@ fn parse_infix_dot_in_list() {
 
 #[test]
 fn parse_colon() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("a : b");
@@ -374,7 +364,6 @@ fn parse_colon() {
 
 #[test]
 fn parse_adjacent_colons() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(a : b c : d)");
@@ -409,7 +398,6 @@ fn parse_adjacent_colons() {
 
 #[test]
 fn parse_nested_colons() {
-    use super::{AstValue::*, TypeContext, TypeVar};
     let parse_context = &mut TypeContext::new();
     let golden_context = &mut TypeContext::new();
     let tokens = super::lex("(a : b : d)");

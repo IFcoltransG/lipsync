@@ -1,14 +1,17 @@
-use std::{default, fmt::Debug};
+use std::fmt::Debug;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 enum Token {
-    LeftBracket,
-    RightBracket,
-    IdentifierToken(String),
-    NumberToken(String),
-    Dot,
-    Colon,
+    LeftBracket(Location),
+    RightBracket(Location),
+    IdentifierToken(String, Location),
+    NumberToken(String, Location),
+    Dot(Location),
+    Colon(Location),
 }
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+struct Location(usize);
 
 fn is_id(character: &char) -> bool {
     !(character.is_whitespace() || "().:".contains(*character))
@@ -16,29 +19,41 @@ fn is_id(character: &char) -> bool {
 
 fn lex(input: &str) -> Vec<Token> {
     use Token::*;
-    let mut string_stream = input.chars().peekable();
+    let mut string_stream = input.chars().enumerate().peekable();
     let mut tokens = Vec::with_capacity(input.len());
-    while let Some(character) = string_stream.next() {
+    while let Some((location, character)) = string_stream.next() {
         match character {
-            '(' => tokens.push(LeftBracket),
-            ')' => tokens.push(RightBracket),
-            '.' => tokens.push(Dot),
-            ':' => tokens.push(Colon),
+            '(' => tokens.push(LeftBracket(Location(location))),
+            ')' => tokens.push(RightBracket(Location(location))),
+            '.' => tokens.push(Dot(Location(location))),
+            ':' => tokens.push(Colon(Location(location))),
             character if character.is_whitespace() => (),
             character if character.is_numeric() => {
                 let mut number = character.to_string();
-                while let Some(true) = string_stream.peek().map(|character| character.is_numeric())
+                while let Some(true) = string_stream
+                    .peek()
+                    .map(|(_, character)| character.is_numeric())
                 {
-                    number.push(string_stream.next().unwrap());
+                    number.push(
+                        string_stream
+                            .next()
+                            .expect("Peeked character has disappeared")
+                            .1,
+                    );
                 }
-                tokens.push(NumberToken(number))
+                tokens.push(NumberToken(number, Location(location)))
             }
             character if is_id(&character) => {
                 let mut id = character.to_string();
-                while let Some(true) = string_stream.peek().map(is_id) {
-                    id.push(string_stream.next().unwrap());
+                while let Some(true) = string_stream.peek().map(|(_, character)| is_id(character)) {
+                    id.push(
+                        string_stream
+                            .next()
+                            .expect("Peeked character has disappeared")
+                            .1,
+                    );
                 }
-                tokens.push(IdentifierToken(id))
+                tokens.push(IdentifierToken(id, Location(location)))
             }
             _ => (),
         }
@@ -82,6 +97,29 @@ impl<V: PartialEq> PartialEq for Ast<V> {
         self_val == other_val
     }
 }
+
+impl PartialEq for Token {
+    fn eq(&self, other: &Self) -> bool {
+        match self {
+            Token::LeftBracket(_) => matches!(other, Token::LeftBracket(_)),
+            Token::RightBracket(_) => matches!(other, Token::RightBracket(_)),
+            Token::IdentifierToken(name, _) => matches!(
+                other,
+                Token::IdentifierToken(other_name, _) if name == other_name
+            ),
+            Token::NumberToken(number, _) => {
+                matches!(
+                    other,
+                    Token::NumberToken(other_number, _) if number == other_number
+                )
+            }
+            Token::Dot(_) => matches!(other, Token::Dot(_)),
+            Token::Colon(_) => matches!(other, Token::Colon(_)),
+        }
+    }
+}
+
+impl Eq for Token {}
 
 impl<V: PartialEq> Eq for Ast<V> {}
 
@@ -185,20 +223,22 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
         while let Some(next_token) = token_stream.next() {
             match next_token {
                 LeftBracketMarker => panic!("Left bracket inside a list somehow?"),
-                TokenMarker(LeftBracket | RightBracket) => panic!("Bracket inside list somehow?"),
-                TokenMarker(IdentifierToken(name)) => add_next_value(
+                TokenMarker(LeftBracket(loc) | RightBracket(loc)) => {
+                    panic!("Bracket inside list somehow? at {:?}", loc)
+                }
+                TokenMarker(IdentifierToken(name, loc)) => add_next_value(
                     Identifier(name.to_owned()).into_ast(TypeVar::new(context)),
                     &mut current_ast,
                     &mut operators,
                     context,
                 ),
-                TokenMarker(NumberToken(number)) => add_next_value(
+                TokenMarker(NumberToken(number, loc)) => add_next_value(
                     Number(number.to_owned()).into_ast(TypeVar::new(context)),
                     &mut current_ast,
                     &mut operators,
                     context,
                 ),
-                TokenMarker(Dot) => {
+                TokenMarker(Dot(loc)) => {
                     if let Ast(Cons(ref last_value, ref rest), _) = current_ast {
                         if **rest != Nil.into_ast(TypeVar::new(context)) {
                             panic!("Dot with more than one expression following")
@@ -208,7 +248,7 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
                         panic!("Dot at end of list")
                     }
                 }
-                TokenMarker(Colon) => {
+                TokenMarker(Colon(loc)) => {
                     if let Ast(Cons(last_value, ref rest), _) = current_ast {
                         current_ast = *rest.clone();
                         operators.push(ColonOp(*last_value))
@@ -242,8 +282,8 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
     let mut output = Vec::with_capacity(tokens.len());
     while let Some(token) = tokens.next() {
         match token {
-            LeftBracket => stack.push(LeftBracketMarker),
-            RightBracket => {
+            LeftBracket(loc) => stack.push(LeftBracketMarker),
+            RightBracket(loc) => {
                 let mut token_list = Vec::with_capacity(stack.len());
                 while let Some(token) = stack.pop() {
                     if let LeftBracketMarker = token {
@@ -253,10 +293,14 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
                 }
                 stack.push(TokenList(assemble_token_list(token_list, context)))
             }
-            IdentifierToken(name) => stack.push(TokenMarker(IdentifierToken(name.to_string()))),
-            NumberToken(number) => stack.push(TokenMarker(NumberToken(number.to_string()))),
-            Dot => stack.push(TokenMarker(Dot)),
-            Colon => stack.push(TokenMarker(Colon)),
+            IdentifierToken(name, loc) => {
+                stack.push(TokenMarker(IdentifierToken(name.to_string(), *loc)))
+            }
+            NumberToken(number, loc) => {
+                stack.push(TokenMarker(NumberToken(number.to_string(), *loc)))
+            }
+            Dot(loc) => stack.push(TokenMarker(Dot(*loc))),
+            Colon(loc) => stack.push(TokenMarker(Colon(*loc))),
         }
     }
     while let Some(token) = stack.pop() {
