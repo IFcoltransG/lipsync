@@ -1,86 +1,29 @@
-use std::fmt::Debug;
+use lex::{Location, Token};
+use std::{fmt::Debug, hash::Hash};
 
-#[derive(Debug, Clone)]
-enum Token {
-    LeftBracket(Location),
-    RightBracket(Location),
-    IdentifierToken(String, Location),
-    NumberToken(String, Location),
-    Dot(Location),
-    Colon(Location),
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
-struct Location(usize);
-
-fn is_id(character: &char) -> bool {
-    !(character.is_whitespace() || "().:".contains(*character))
-}
-
-fn lex(input: &str) -> Vec<Token> {
-    use Token::*;
-    let mut string_stream = input.chars().enumerate().peekable();
-    let mut tokens = Vec::with_capacity(input.len());
-    while let Some((location, character)) = string_stream.next() {
-        match character {
-            '(' => tokens.push(LeftBracket(Location(location))),
-            ')' => tokens.push(RightBracket(Location(location))),
-            '.' => tokens.push(Dot(Location(location))),
-            ':' => tokens.push(Colon(Location(location))),
-            character if character.is_whitespace() => (),
-            character if character.is_numeric() => {
-                let mut number = character.to_string();
-                while let Some(true) = string_stream
-                    .peek()
-                    .map(|(_, character)| character.is_numeric())
-                {
-                    number.push(
-                        string_stream
-                            .next()
-                            .expect("Peeked character has disappeared")
-                            .1,
-                    );
-                }
-                tokens.push(NumberToken(number, Location(location)))
-            }
-            character if is_id(&character) => {
-                let mut id = character.to_string();
-                while let Some(true) = string_stream.peek().map(|(_, character)| is_id(character)) {
-                    id.push(
-                        string_stream
-                            .next()
-                            .expect("Peeked character has disappeared")
-                            .1,
-                    );
-                }
-                tokens.push(IdentifierToken(id, Location(location)))
-            }
-            _ => (),
-        }
-    }
-    tokens
-}
+pub(crate) mod lex;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-enum Type<V> {
+pub(crate) enum Type<V> {
     Unknown(V),
     Expr(AstNode<V>),
+    TypeKind,
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-struct TypeContext {
+pub(crate) struct TypeContext {
     latest_id: usize,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-struct TypeVar {
+#[derive(Debug, Eq, PartialEq, Clone, Hash)]
+pub(crate) struct TypeVar {
     id: usize,
 }
 
-type AstNode<V> = Box<Ast<V>>;
+pub(crate) type AstNode<V> = Box<Ast<V>>;
 
 #[derive(Debug, Eq, PartialEq, Clone)]
-enum AstValue<V> {
+pub(crate) enum AstValue<V> {
     Identifier(String),
     Number(String), // should probably do some parsing here
     Cons(AstNode<V>, AstNode<V>),
@@ -89,7 +32,7 @@ enum AstValue<V> {
 }
 
 #[derive(Debug, Clone)]
-struct Ast<V>(AstValue<V>, Type<V>, Location);
+pub(crate) struct Ast<V>(pub AstValue<V>, pub Type<V>, pub Location);
 
 impl<V: PartialEq> PartialEq for Ast<V> {
     fn eq(&self, Ast(other_val, ..): &Self) -> bool {
@@ -100,44 +43,8 @@ impl<V: PartialEq> PartialEq for Ast<V> {
 
 impl<V: PartialEq> Eq for Ast<V> {}
 
-impl PartialEq for Token {
-    fn eq(&self, other: &Self) -> bool {
-        match self {
-            Token::LeftBracket(_) => matches!(other, Token::LeftBracket(_)),
-            Token::RightBracket(_) => matches!(other, Token::RightBracket(_)),
-            Token::IdentifierToken(name, _) => matches!(
-                other,
-                Token::IdentifierToken(other_name, _) if name == other_name
-            ),
-            Token::NumberToken(number, _) => {
-                matches!(
-                    other,
-                    Token::NumberToken(other_number, _) if number == other_number
-                )
-            }
-            Token::Dot(_) => matches!(other, Token::Dot(_)),
-            Token::Colon(_) => matches!(other, Token::Colon(_)),
-        }
-    }
-}
-
-impl Eq for Token {}
-
-impl Token {
-    fn location(&self) -> Location {
-        match self {
-            Token::LeftBracket(location) => *location,
-            Token::RightBracket(location) => *location,
-            Token::IdentifierToken(_, location) => *location,
-            Token::NumberToken(_, location) => *location,
-            Token::Dot(location) => *location,
-            Token::Colon(location) => *location,
-        }
-    }
-}
-
 impl TypeContext {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { latest_id: 0 }
     }
 
@@ -148,7 +55,7 @@ impl TypeContext {
 }
 
 impl TypeVar {
-    fn new(context: &mut TypeContext) -> Self {
+    pub(crate) fn new(context: &mut TypeContext) -> Self {
         TypeVar {
             id: context.next_id(),
         }
@@ -156,16 +63,16 @@ impl TypeVar {
 }
 
 impl<V> AstValue<V> {
-    fn into_ast(self, type_var: V, location: Location) -> Ast<V> {
+    pub(crate) fn into_ast(self, type_var: V, location: Location) -> Ast<V> {
         Ast(self, Type::Unknown(type_var), location)
     }
 }
 impl<V> Ast<V> {
-    fn cons_to(self, tail: Ast<V>, type_var: V, location: Location) -> Ast<V> {
+    pub(crate) fn cons_to(self, tail: Ast<V>, type_var: V, location: Location) -> Ast<V> {
         AstValue::Cons(Box::new(self), Box::new(tail)).into_ast(type_var, location)
     }
 
-    fn ascribe(self, type_of: Ast<V>, type_var: V, location: Location) -> Ast<V> {
+    pub(crate) fn ascribe(self, type_of: Ast<V>, type_var: V, location: Location) -> Ast<V> {
         AstValue::Ascription(Box::new(self), Type::Expr(Box::new(type_of)))
             .into_ast(type_var, location)
     }
@@ -188,16 +95,17 @@ impl<V: Debug> Type<V> {
     fn pretty(&self) -> String {
         match self {
             Type::Unknown(_) => "?".to_string(),
+            Type::TypeKind => "Ty*".to_string(),
             Type::Expr(ast) => format!("TyFrom[{}]", ast.pretty()),
         }
     }
 }
 
-fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
+pub(crate) fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
     fn assemble_token_list(
         tokens: Vec<Tokenlike<TypeVar>>,
         context: &mut TypeContext,
-        location: Location
+        location: Location,
     ) -> Ast<TypeVar> {
         fn add_next_value(
             mut value: Ast<TypeVar>,
@@ -277,7 +185,7 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
                     }
                 }
                 TokenMarker(Colon(loc)) => {
-                    if let Ast(Cons(last_value, ref rest), _, _) = current_ast {
+                    if let Ast(Cons(last_value, ref rest), ..) = current_ast {
                         current_ast = *rest.clone();
                         operators.push(ColonOp(*last_value))
                         // colon op contains ascribed type
@@ -315,7 +223,7 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
             RightBracket(loc) => {
                 let mut token_list = Vec::with_capacity(stack.len());
                 while let Some(token) = stack.pop() {
-                    if let LeftBracketMarker(loc) = token {
+                    if let LeftBracketMarker(_) = token {
                         break;
                     }
                     token_list.push(token)
@@ -343,10 +251,6 @@ fn parse(tokens: Vec<Token>, context: &mut TypeContext) -> Ast<TypeVar> {
     }
     assemble_token_list(output, context, Location(0))
 }
-
-// fn typecheck(Ast<>) {
-
-//}
 
 #[cfg(test)]
 mod tests;
