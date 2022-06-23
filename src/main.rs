@@ -5,3 +5,4 @@ fn main() {
 }
 
 mod parse;
+mod typecheck;

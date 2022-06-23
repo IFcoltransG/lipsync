@@ -1,16 +1,11 @@
 use lex::{Location, Token};
 use std::{fmt::Debug, hash::Hash};
 
+use crate::typecheck::Type;
+
 pub(crate) mod lex;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
-pub(crate) enum Type<V> {
-    Unknown(V),
-    Expr(AstNode<V>),
-    TypeKind,
-}
-
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub(crate) struct TypeContext {
     latest_id: usize,
 }
@@ -78,6 +73,13 @@ impl<V> Ast<V> {
     }
 }
 
+impl<V: Clone> Ast<V> {
+    pub(crate) fn get_type(&self) -> Type<V> {
+        let Ast(_, type_of, _) = self;
+        type_of.clone()
+    }
+}
+
 impl<V: Debug> Ast<V> {
     fn pretty(&self) -> String {
         use AstValue::*;
@@ -96,6 +98,7 @@ impl<V: Debug> Type<V> {
         match self {
             Type::Unknown(_) => "?".to_string(),
             Type::TypeKind => "Ty*".to_string(),
+            Type::Special(id) => format!("TyOf[{}]", id),
             Type::Expr(ast) => format!("TyFrom[{}]", ast.pretty()),
         }
     }
