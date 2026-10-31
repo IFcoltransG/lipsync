@@ -1,3 +1,5 @@
+# [MIGRATED TO CODEBERG 2026-10-31](https://codeberg.org/IFcoltransG/lipsync)
+
 # Lipsync
 
 Lipsync is a Lisp-like logical language allowing overloads, loaded with a type system, and which performs some inference.
